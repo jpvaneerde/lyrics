@@ -1,0 +1,13 @@
+# torch + torchaudio come from the PyTorch CUDA index (see setup.ps1)
+stable-ts>=2.17
+PySide6>=6.7
+mutagen>=1.47
+rapidfuzz>=3.0
+# demucs runtime deps (demucs itself installed with --no-deps)
+dora-search
+einops
+julius>=0.2.3
+lameenc>=1.2
+openunmix
+pyyaml
+tqdm
