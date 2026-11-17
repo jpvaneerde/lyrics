@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import time
 import traceback
@@ -32,10 +33,30 @@ class Job:
     lyrics_source: str = ""
     n_lines: int = 0
     has_lrc: bool = False
+    lrc_lines: int = -1  # lyric lines in the existing .lrc (-1: there is none, 0: it is empty)
+    review: bool = False  # set by process(): the result needs a look
+
+    @property
+    def usable_lrc(self) -> bool:
+        """An .lrc with lyrics in it (an empty one counts as missing)."""
+        return self.has_lrc and self.lrc_lines != 0
+
+    @property
+    def empty_lrc(self) -> bool:
+        return self.has_lrc and self.lrc_lines == 0
 
     @property
     def ready(self) -> bool:
-        return self.n_lines > 0 and not self.has_lrc
+        return self.n_lines > 0 and not self.usable_lrc
+
+    @property
+    def category(self) -> str:
+        """no lyrics | empty lrc | no lrc | has lrc"""
+        if self.empty_lrc:
+            return "empty lrc"
+        if self.has_lrc:
+            return "has lrc"
+        return "no lrc" if self.n_lines else "no lyrics"
 
 
 @dataclass
@@ -49,6 +70,23 @@ class Result:
     structure: str = ""
 
 
+_LYRIC_LINE = re.compile(r"^\s*\[\d+:\d+(?:[.:]\d+)?\]\s*(?:<[^>]*>\s*)*(\S.*)?$")
+
+
+def count_lrc_lines(lrc: Path) -> int:
+    """Lyric lines in an .lrc file: lines with a time and some text (tags like [ar:..] and empty lines don't count)."""
+    try:
+        text = lrc.read_text(encoding="utf-8-sig", errors="replace")
+    except OSError:
+        return 0
+    n = 0
+    for ln in text.splitlines():
+        m = _LYRIC_LINE.match(ln)
+        if m and re.sub(r"<[^>]*>", "", m.group(1) or "").strip():
+            n += 1
+    return n
+
+
 def scan(folder: Path, recursive: bool = True) -> list[Job]:
     it = folder.rglob("*") if recursive else folder.glob("*")
     jobs = []
@@ -56,7 +94,8 @@ def scan(folder: Path, recursive: bool = True) -> list[Job]:
         if p.is_file() and p.suffix.lower() in AUDIO_EXTS:
             stanzas, src = find_lyrics(p)
             lrc = p.with_suffix(".lrc")
-            jobs.append(Job(p, lrc, src, len(flat_lines(stanzas)), lrc.exists()))
+            has = lrc.exists()
+            jobs.append(Job(p, lrc, src, len(flat_lines(stanzas)), has, count_lrc_lines(lrc) if has else -1))
     return jobs
 
 
@@ -71,7 +110,7 @@ def backup_path(lrc: Path) -> Path:
 
 
 def process(engine, job: Job, opts: Options, log: Callable[[str], None] = print) -> Result:
-    if job.lrc.exists() and not opts.overwrite:
+    if job.usable_lrc and not opts.overwrite:
         return Result("skipped: .lrc exists")
     stanzas, src = find_lyrics(job.audio)  # re-read: the .txt may have been edited
     if not stanzas:
@@ -110,10 +149,12 @@ def process(engine, job: Job, opts: Options, log: Callable[[str], None] = print)
     text = build_lrc(segs, words=opts.words, meta=read_meta(job.audio))
     tmp = job.lrc.with_name(job.lrc.name + ".tmp")
     tmp.write_text(text, encoding="utf-8")
-    if opts.backup and job.lrc.exists():
+    if opts.backup and job.lrc.exists() and job.lrc.stat().st_size > 0:
         shutil.copy2(job.lrc, backup_path(job.lrc))
     os.replace(tmp, job.lrc)
     job.has_lrc = True
+    job.lrc_lines = len([s for s in segs if s["text"]])
+    job.review = bool(warnings)
 
     status = "done, check it" if warnings else "done"
     if note.startswith("structure fixed"):

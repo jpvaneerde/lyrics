@@ -65,3 +65,7 @@ confidence — usually the lyrics don't match the recording), red = error.
 ## Overwriting
 
 Tick **Overwrite existing .lrc** to redo songs that already have one. With **Keep old as .lrc.bak** ticked (the default) the old file is first saved next to it as `song.lrc.bak` (`.bak2`, `.bak3`… if one exists), so hand-fixed files are never lost. On the command line: `--overwrite --backup`.
+
+## Filtering the list
+
+The **Show** box above the table narrows the list: *No .lrc yet* (lyrics text but no `.lrc`), *No lyrics text* (no `.txt` and nothing in the tags: these need lyrics added), *Empty .lrc* (a file with no lyric lines; it is treated as missing and gets redone), and *Needs review* (songs marked "check it" in this session). **Select ready** and **Sync checked** only act on the rows that are shown.

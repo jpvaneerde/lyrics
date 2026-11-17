@@ -28,7 +28,7 @@ def main(argv=None) -> int:
         return 2
 
     jobs = scan(a.folder, recursive=not a.no_recursive)
-    todo = [j for j in jobs if j.n_lines and (a.overwrite or not j.has_lrc)]
+    todo = [j for j in jobs if j.n_lines and (a.overwrite or not j.usable_lrc)]
     print(f"{len(jobs)} audio files, {len(todo)} to sync")
     if not todo:
         return 0

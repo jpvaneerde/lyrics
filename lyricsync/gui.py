@@ -133,6 +133,22 @@ class MainWindow(QMainWindow):
             r2.addWidget(w)
         r2.addStretch(1)
 
+        self.show = QComboBox()
+        for label, key in (("All", "all"), ("No .lrc yet", "no lrc"), ("No lyrics text", "no lyrics"),
+                           ("Empty .lrc", "empty lrc"), ("Needs review", "review")):
+            self.show.addItem(label, key)
+        self.show.setToolTip("No .lrc yet: lyrics text exists but no .lrc.\n"
+                             "No lyrics text: no .txt next to the song and none in its tags (nothing to sync).\n"
+                             "Empty .lrc: an .lrc file with no lyric lines in it.\n"
+                             "Needs review: songs marked 'check it' in this session.")
+        self.show.currentIndexChanged.connect(self.apply_filter)
+        self.shown = QLabel("")
+        rf = QHBoxLayout()
+        rf.addWidget(QLabel("Show:"))
+        rf.addWidget(self.show)
+        rf.addWidget(self.shown)
+        rf.addStretch(1)
+
         # table
         self.table = QTableWidget(0, len(COLS))
         self.table.setHorizontalHeaderLabels(COLS)
@@ -154,7 +170,7 @@ class MainWindow(QMainWindow):
         split.setSizes([520, 180])
 
         # bottom row
-        b_all = QPushButton("Select ready")
+        b_all = QPushButton("Select ready (shown)")
         b_all.clicked.connect(lambda: self.check(lambda j: j.ready))
         b_none = QPushButton("Select none")
         b_none.clicked.connect(lambda: self.check(lambda j: False))
@@ -174,6 +190,7 @@ class MainWindow(QMainWindow):
         v = QVBoxLayout(central)
         v.addLayout(r1)
         v.addLayout(r2)
+        v.addLayout(rf)
         v.addWidget(split, 1)
         v.addLayout(r3)
         self.setCentralWidget(central)
@@ -217,15 +234,34 @@ class MainWindow(QMainWindow):
             self.table.setItem(i, C_FILE, it)
             lyr = f"{j.lyrics_source} ({j.n_lines} lines)" if j.n_lines else "—"
             self.table.setItem(i, C_LYR, QTableWidgetItem(lyr))
-            st = "has .lrc" if j.has_lrc else ("ready" if j.n_lines else "no lyrics")
+            st = "empty .lrc" if j.empty_lrc and not j.n_lines else (
+                "has .lrc" if j.usable_lrc else ("ready" if j.n_lines else "no lyrics"))
             self.set_row(i, st, "", "", "", "#757575" if st != "ready" else "#000000")
         ready = sum(j.ready for j in self.jobs)
         self.log(f"Scanned {folder}: {len(self.jobs)} audio files, {ready} ready to sync.")
         self.progress.setValue(0)
+        self.apply_filter()
+
+    def matches(self, j: Job) -> bool:
+        key = self.show.currentData()
+        if key == "all":
+            return True
+        if key == "review":
+            return j.review
+        return j.category == key
+
+    def apply_filter(self):
+        n = 0
+        for i, j in enumerate(self.jobs):
+            show = self.matches(j)
+            self.table.setRowHidden(i, not show)
+            n += show
+        self.shown.setText(f"{n} of {len(self.jobs)} shown")
 
     def check(self, pred):
-        for i, j in enumerate(self.jobs):
-            self.table.item(i, C_FILE).setCheckState(Qt.Checked if pred(j) else Qt.Unchecked)
+        for i, j in enumerate(self.jobs):   # only the rows that are shown (the filter), the rest are unchecked
+            self.table.item(i, C_FILE).setCheckState(
+                Qt.Checked if pred(j) and not self.table.isRowHidden(i) else Qt.Unchecked)
 
     def set_row(self, row, status, lang, conf, secs, color):
         for col, val in ((C_STATUS, status), (C_LANG, lang), (C_CONF, conf), (C_TIME, secs)):
@@ -259,7 +295,7 @@ class MainWindow(QMainWindow):
     # ---- run --------------------------------------------------------------
     def start(self):
         items = [(i, j) for i, j in enumerate(self.jobs)
-                 if self.table.item(i, C_FILE).checkState() == Qt.Checked]
+                 if self.table.item(i, C_FILE).checkState() == Qt.Checked and not self.table.isRowHidden(i)]
         if not items:
             self.log("Nothing checked.")
             return
@@ -284,6 +320,7 @@ class MainWindow(QMainWindow):
         self.worker.progress.connect(lambda d, t: self.progress.setValue(d))
         self.worker.finished.connect(self.thread.quit)
         self.worker.finished.connect(lambda: self.set_running(False))
+        self.worker.finished.connect(self.apply_filter)
         self.worker.finished.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
         self.thread.start()
