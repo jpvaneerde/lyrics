@@ -60,3 +60,8 @@ skipped unless *Overwrite* is on).
 
 **Status colours:** green = done, orange = done but check it (many zero-length lines or low
 confidence — usually the lyrics don't match the recording), red = error.
+
+
+## Overwriting
+
+Tick **Overwrite existing .lrc** to redo songs that already have one. With **Keep old as .lrc.bak** ticked (the default) the old file is first saved next to it as `song.lrc.bak` (`.bak2`, `.bak3`… if one exists), so hand-fixed files are never lost. On the command line: `--overwrite --backup`.

@@ -15,6 +15,7 @@ def main(argv=None) -> int:
     ap.add_argument("-l", "--language", default="auto", help="ISO code (en, nl, sv…) or auto")
     ap.add_argument("--no-separate", action="store_true", help="skip vocal isolation")
     ap.add_argument("-w", "--words", action="store_true", help="word-level (enhanced) LRC")
+    ap.add_argument("--backup", action="store_true", help="with --overwrite: keep the old .lrc as .lrc.bak")
     ap.add_argument("-f", "--overwrite", action="store_true", help="redo files that already have .lrc")
     ap.add_argument("--no-recursive", action="store_true")
     ap.add_argument("--no-structure", action="store_true",
@@ -37,7 +38,7 @@ def main(argv=None) -> int:
     eng = Engine()
     print(f"Device: {eng.device_name}")
     opts = Options(a.model, None if a.language == "auto" else a.language,
-                   not a.no_separate, a.words, a.overwrite, not a.no_structure)
+                   not a.no_separate, a.words, a.overwrite, not a.no_structure, a.backup)
     failed = 0
     for i, job in enumerate(todo, 1):
         r = process(eng, job, opts, log=lambda m: None)

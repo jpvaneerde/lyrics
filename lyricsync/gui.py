@@ -123,9 +123,13 @@ class MainWindow(QMainWindow):
         self.structure.setChecked(self.s.value("structure", True, type=bool))
         self.overwrite = QCheckBox("Overwrite existing .lrc")
         self.overwrite.setChecked(self.s.value("overwrite", False, type=bool))
+        self.backup = QCheckBox("Keep old as .lrc.bak")
+        self.backup.setToolTip("When overwriting, first save the existing .lrc next to it as .lrc.bak\n"
+                               "(.bak2, .bak3 ... if there already is one), so hand-fixed files aren't lost.")
+        self.backup.setChecked(self.s.value("backup", True, type=bool))
         r2 = QHBoxLayout()
         for w in (QLabel("Model:"), self.model, QLabel("Language:"), self.lang,
-                  self.separate, self.structure, self.words, self.overwrite):
+                  self.separate, self.structure, self.words, self.overwrite, self.backup):
             r2.addWidget(w)
         r2.addStretch(1)
 
@@ -242,13 +246,13 @@ class MainWindow(QMainWindow):
         lang = self.lang.currentText().strip().lower()
         return Options(self.model.currentText(), None if lang in ("", "auto") else lang,
                        self.separate.isChecked(), self.words.isChecked(),
-                       self.overwrite.isChecked(), self.structure.isChecked())
+                       self.overwrite.isChecked(), self.structure.isChecked(), self.backup.isChecked())
 
     def save_settings(self):
         for k, v in (("folder", self.folder.text()), ("recursive", self.recursive.isChecked()),
                      ("model", self.model.currentText()), ("lang", self.lang.currentText()),
                      ("separate", self.separate.isChecked()), ("words", self.words.isChecked()),
-                     ("overwrite", self.overwrite.isChecked()),
+                     ("overwrite", self.overwrite.isChecked()), ("backup", self.backup.isChecked()),
                      ("structure", self.structure.isChecked())):
             self.s.setValue(k, v)
 

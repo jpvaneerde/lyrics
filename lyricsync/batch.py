@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import time
 import traceback
 from dataclasses import dataclass, field
@@ -21,6 +22,7 @@ class Options:
     words: bool = False
     overwrite: bool = False
     structure: bool = True  # fix missing / misplaced choruses from the audio
+    backup: bool = False  # when overwriting, keep the old .lrc as .lrc.bak (.lrc.bak2, ...)
 
 
 @dataclass
@@ -56,6 +58,16 @@ def scan(folder: Path, recursive: bool = True) -> list[Job]:
             lrc = p.with_suffix(".lrc")
             jobs.append(Job(p, lrc, src, len(flat_lines(stanzas)), lrc.exists()))
     return jobs
+
+
+def backup_path(lrc: Path) -> Path:
+    """song.lrc.bak, or song.lrc.bak2, .bak3 ... when earlier backups exist (never replaces one)."""
+    p = lrc.with_name(lrc.name + ".bak")
+    n = 2
+    while p.exists():
+        p = lrc.with_name(f"{lrc.name}.bak{n}")
+        n += 1
+    return p
 
 
 def process(engine, job: Job, opts: Options, log: Callable[[str], None] = print) -> Result:
@@ -98,6 +110,8 @@ def process(engine, job: Job, opts: Options, log: Callable[[str], None] = print)
     text = build_lrc(segs, words=opts.words, meta=read_meta(job.audio))
     tmp = job.lrc.with_name(job.lrc.name + ".tmp")
     tmp.write_text(text, encoding="utf-8")
+    if opts.backup and job.lrc.exists():
+        shutil.copy2(job.lrc, backup_path(job.lrc))
     os.replace(tmp, job.lrc)
     job.has_lrc = True
 
